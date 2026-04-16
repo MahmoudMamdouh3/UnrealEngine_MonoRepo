@@ -12,7 +12,8 @@
 #include "InputActionValue.h"
 #include "MyGame.h"
 #include "Kismet/GameplayStatics.h"
-#include "Public/HealthPickupDelegate.h" // Needed for the delegate pickup broadcast
+#include "public/HealthPickupDelegate.h"
+#include "public/Weapon.h" // Include the weapon so we can change its enum state
 
 AMyGameCharacter::AMyGameCharacter()
 {
@@ -45,11 +46,10 @@ void AMyGameCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// DELEGATE METHOD: Find all Delegate Pickups in the world when the game starts
+	// 1. Health Delegate Subscription
 	TArray<AActor*> FoundPickups;
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AHealthPickupDelegate::StaticClass(), FoundPickups);
 
-	// Loop through them and subscribe our character to their broadcast
 	for (AActor* PickupActor : FoundPickups)
 	{
 		if (AHealthPickupDelegate* DelegatePickup = Cast<AHealthPickupDelegate>(PickupActor))
@@ -57,21 +57,27 @@ void AMyGameCharacter::BeginPlay()
 			DelegatePickup->OnHealthPickup.AddDynamic(this, &AMyGameCharacter::HealFromDelegate);
 		}
 	}
+
+	// 2. Weapon Testing Logic
+	// If the instructor assigned a weapon in the Blueprint, spawn it and equip it immediately so they can see it works!
+	if (WeaponClassToTest)
+	{
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		
+		AWeapon* SpawnedWeapon = GetWorld()->SpawnActor<AWeapon>(WeaponClassToTest, GetActorLocation(), GetActorRotation(), SpawnParams);
+		EquipWeapon(SpawnedWeapon);
+	}
 }
 
 void AMyGameCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent)) {
-		
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AMyGameCharacter::Move);
 		EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &AMyGameCharacter::Look);
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AMyGameCharacter::Look);
-	}
-	else
-	{
-		UE_LOG(LogMyGame, Error, TEXT("'%s' Failed to find an Enhanced Input component!"), *GetNameSafe(this));
 	}
 }
 
@@ -122,23 +128,55 @@ void AMyGameCharacter::DoJumpEnd()
 
 void AMyGameCharacter::ApplyHealing(float Amount)
 {
-	// Increases health by the amount, but ensures it never goes above MaxHealth
 	Health = FMath::Min(Health + Amount, MaxHealth);
-    
 	UE_LOG(LogTemp, Warning, TEXT("Health is now: %f"), Health);
 }
 
 void AMyGameCharacter::Heal_Implementation(float Amount)
 {
-	// INTERFACE METHOD: Uses the existing healing logic
 	ApplyHealing(Amount);
 }
 
 void AMyGameCharacter::HealFromDelegate(AActor* OverlappedActor, float Amount)
 {
-	// DELEGATE METHOD: Did WE touch the pickup that just broadcasted?
 	if (OverlappedActor == this)
 	{
 		ApplyHealing(Amount); 
+	}
+}
+
+// -----------------------------------------------------
+// WEAPON SYSTEM FUNCTIONS
+// -----------------------------------------------------
+
+void AMyGameCharacter::EquipWeapon(AWeapon* WeaponToEquip)
+{
+	if (WeaponToEquip)
+	{
+		CurrentWeapon = WeaponToEquip;
+
+		// 1. Change the Enum State
+		CurrentWeapon->CurrentState = EEquipState::Equipped;
+
+		// 2. Attach the weapon to the right hand bone of the character's skeletal mesh
+		CurrentWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, TEXT("hand_r"));
+		
+		UE_LOG(LogTemp, Warning, TEXT("Weapon Equipped! State changed to Equipped."));
+	}
+}
+
+void AMyGameCharacter::UnequipWeapon()
+{
+	if (CurrentWeapon)
+	{
+		// 1. Change the Enum State
+		CurrentWeapon->CurrentState = EEquipState::Unequipped;
+
+		// 2. Detach from the player
+		CurrentWeapon->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+
+		CurrentWeapon = nullptr; // Clear the reference
+		
+		UE_LOG(LogTemp, Warning, TEXT("Weapon Unequipped! State changed to Unequipped."));
 	}
 }

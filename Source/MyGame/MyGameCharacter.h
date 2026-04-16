@@ -5,13 +5,16 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Logging/LogMacros.h"
-#include "Public/HealInterface.h"
+#include "public/HealInterface.h"
 #include "MyGameCharacter.generated.h"
 
 class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
 struct FInputActionValue;
+
+// Forward declaration so the character knows the Weapon class exists
+class AWeapon; 
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
@@ -36,7 +39,6 @@ public:
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 protected:
-	// Subscribes to the Delegate Pickups when the game starts
 	virtual void BeginPlay() override;
 
 	/** Called for movement input */
@@ -63,46 +65,55 @@ protected:
 
 	// Health Variables
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Health")
-	float Health = 50.f; // Starting at 50 so we can see the healing work
+	float Health = 50.f; 
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Health")
 	float MaxHealth = 100.f;
 
 public:
-	/** Handles move inputs from either controls or UI interfaces */
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoMove(float Right, float Forward);
 
-	/** Handles look inputs from either controls or UI interfaces */
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoLook(float Yaw, float Pitch);
 
-	/** Handles jump pressed inputs from either controls or UI interfaces */
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoJumpStart();
 
-	/** Handles jump pressed inputs from either controls or UI interfaces */
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoJumpEnd();
 
 	// -----------------------------------------------------
-	// HEALING SYSTEM FUNCTIONS
+	// HEALING SYSTEM 
 	// -----------------------------------------------------
-
-	// 1. Base Healing Logic
 	UFUNCTION(BlueprintCallable, Category = "Health")
 	void ApplyHealing(float Amount);
 	
-	// 2. Interface Method Implementation
 	virtual void Heal_Implementation(float Amount) override;
 
-	// 3. Delegate Method Listener
 	UFUNCTION()
 	void HealFromDelegate(AActor* OverlappedActor, float Amount);
 	
-	/** Returns CameraBoom subobject **/
-	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
+	// -----------------------------------------------------
+	// WEAPON SYSTEM (BONUS TASK)
+	// -----------------------------------------------------
+	
+	// The weapon currently held by the player
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
+	AWeapon* CurrentWeapon;
 
-	/** Returns FollowCamera subobject **/
+	// We use this to select a weapon blueprint in the editor to spawn for testing
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
+	TSubclassOf<AWeapon> WeaponClassToTest;
+
+	// Changes enum state and attaches to mesh
+	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	void EquipWeapon(AWeapon* WeaponToEquip);
+
+	// Changes enum state and detaches from mesh
+	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	void UnequipWeapon();
+
+	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
 };
