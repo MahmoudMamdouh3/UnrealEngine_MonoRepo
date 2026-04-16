@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Logging/LogMacros.h"
-#include "MyGame\Public\HealInterface.h"
+#include "Public/HealInterface.h"
 #include "MyGameCharacter.generated.h"
 
 class USpringArmComponent;
@@ -15,10 +15,6 @@ struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
-/**
- *  A simple player-controllable third person character
- *  Implements a controllable orbiting camera
- */
 UCLASS(abstract)
 class AMyGameCharacter : public ACharacter, public IHealInterface
 {
@@ -31,9 +27,24 @@ class AMyGameCharacter : public ACharacter, public IHealInterface
 	/** Follow camera */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	UCameraComponent* FollowCamera;
-	
-protected:
 
+public:
+	/** Constructor */
+	AMyGameCharacter();	
+
+	/** Initialize input action bindings */
+	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+
+protected:
+	// Subscribes to the Delegate Pickups when the game starts
+	virtual void BeginPlay() override;
+
+	/** Called for movement input */
+	void Move(const FInputActionValue& Value);
+
+	/** Called for looking input */
+	void Look(const FInputActionValue& Value);
+	
 	/** Jump Input Action */
 	UPROPERTY(EditAnywhere, Category="Input")
 	UInputAction* JumpAction;
@@ -50,24 +61,7 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Input")
 	UInputAction* MouseLookAction;
 
-public:
-
-	/** Constructor */
-	AMyGameCharacter();	
-
-protected:
-
-	/** Initialize input action bindings */
-	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
-
-protected:
-
-	/** Called for movement input */
-	void Move(const FInputActionValue& Value);
-
-	/** Called for looking input */
-	void Look(const FInputActionValue& Value);
-	
+	// Health Variables
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Health")
 	float Health = 50.f; // Starting at 50 so we can see the healing work
 
@@ -75,7 +69,6 @@ protected:
 	float MaxHealth = 100.f;
 
 public:
-
 	/** Handles move inputs from either controls or UI interfaces */
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoMove(float Right, float Forward);
@@ -92,20 +85,24 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoJumpEnd();
 
-public:
+	// -----------------------------------------------------
+	// HEALING SYSTEM FUNCTIONS
+	// -----------------------------------------------------
 
+	// 1. Base Healing Logic
 	UFUNCTION(BlueprintCallable, Category = "Health")
 	void ApplyHealing(float Amount);
 	
+	// 2. Interface Method Implementation
+	virtual void Heal_Implementation(float Amount) override;
+
+	// 3. Delegate Method Listener
+	UFUNCTION()
+	void HealFromDelegate(AActor* OverlappedActor, float Amount);
 	
 	/** Returns CameraBoom subobject **/
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
 
 	/** Returns FollowCamera subobject **/
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
-	
-	
-	virtual void Heal_Implementation(float Amount) override;
-	
 };
-
